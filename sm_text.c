@@ -38,7 +38,7 @@ ngram_t;
 int load_corpus(char *);
 void print_trie(node_t *, unsigned long);
 void sm_text(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
-void sm_text_next_node(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
+int sm_text_next_node(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
 letter_t *new_letter(node_t *, int);
 letter_t *get_letter(node_t *, int);
 void set_letter(letter_t *, int);
@@ -274,22 +274,28 @@ void sm_text(unsigned long ngram_idx, unsigned long input_idx, unsigned long inp
 			if (ngrams[j].level == j) {
 				unsigned long k;
 				if (j <= ngram_idx) {
-					sm_text_next_node(j, input_idx, input_len, output_idx, score_val+ngrams_size-ngram_idx);
+					if (!sm_text_next_node(j, input_idx, input_len, output_idx, score_val+ngrams_size-ngram_idx)) {
+						return;
+					}
 				}
 				else {
-					sm_text_next_node(j, input_idx, input_len, output_idx, score_val);
+					if (!sm_text_next_node(j, input_idx, input_len, output_idx, score_val)) {
+						return;
+					}
 				}
 				for (k = j; k < ngrams_size; k++) {
 					set_ngram(ngrams+k, ngrams[j-1].node, j-1);
 				}
 			}
 		}
-		sm_text_next_node(0UL, input_idx, input_len, output_idx, score_val+ngrams_size-ngram_idx);
+		if (!sm_text_next_node(0UL, input_idx, input_len, output_idx, score_val+ngrams_size-ngram_idx)) {
+			return;
+		}
 		copy_ngrams(stack+stack_idx, ngrams);
 	}
 }
 
-void sm_text_next_node(unsigned long ngram_idx, unsigned long input_idx, unsigned long input_len, unsigned long output_idx, unsigned long score_val) {
+int sm_text_next_node(unsigned long ngram_idx, unsigned long input_idx, unsigned long input_len, unsigned long output_idx, unsigned long score_val) {
 	score_t *score = get_score(ngrams[ngram_idx].node, input_idx);
 	if (!score || score_val < score->val) {
 		output[output_idx] = ' ';
@@ -301,9 +307,12 @@ void sm_text_next_node(unsigned long ngram_idx, unsigned long input_idx, unsigne
 			score->val = score_val;
 		}
 		else {
-			new_score(ngrams[ngram_idx].node, input_idx, score_val);
+			if (!new_score(ngrams[ngram_idx].node, input_idx, score_val)) {
+				return 0;
+			}
 		}
 	}
+	return 1;
 }
 
 letter_t *new_letter(node_t *node, int symbol) {
