@@ -38,6 +38,7 @@ ngram_t;
 int load_corpus(char *);
 void print_trie(node_t *, unsigned long);
 void sm_text(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
+void sm_text_next_node(unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
 letter_t *new_letter(node_t *, int);
 letter_t *get_letter(node_t *, int);
 void set_letter(letter_t *, int);
@@ -213,6 +214,7 @@ void sm_text(unsigned long ngram_idx, unsigned long input_idx, unsigned long inp
 	int choices[CHOICES_MAX];
 	unsigned long choices_max, tree_idx, choices_n, i;
 	if (input_idx == input_len) {
+		score_val += ngrams_size-ngram_idx;
 		if (get_letter(ngrams[ngram_idx].node, '\n') && score_val < best_score_val) {
 			unsigned long j;
 			printf("Score %lu ", score_val);
@@ -263,7 +265,6 @@ void sm_text(unsigned long ngram_idx, unsigned long input_idx, unsigned long inp
 	}
 	if (get_letter(ngrams[ngram_idx].node, '\n')) {
 		unsigned long stack_idx = input_idx*ngrams_size, j;
-		score_t *score;
 		copy_ngrams(ngrams, stack+stack_idx);
 		for (j = 0; j < ngrams_size; j++) {
 			ngram_get_word_end(ngrams+j);
@@ -272,40 +273,36 @@ void sm_text(unsigned long ngram_idx, unsigned long input_idx, unsigned long inp
 		for (j = ngrams_size-1; j > 0; j--) {
 			if (ngrams[j].level == j) {
 				unsigned long k;
-				score = get_score(ngrams[j].node, input_idx);
-				if (!score || score_val < score->val) {
-					output[output_idx] = ' ';
-					if (j > ngram_idx) {
-						sm_text(j, input_idx, input_len, output_idx+1, score_val);
-					}
-					else {
-						sm_text(j, input_idx, input_len, output_idx+1, score_val+ngrams_size-j);
-					}
-				}
-				score = get_score(ngrams[j].node, input_idx);
-				if (score) {
-					score->val = score_val;
+				if (j <= ngram_idx) {
+					sm_text_next_node(j, input_idx, input_len, output_idx, score_val+ngrams_size-ngram_idx);
 				}
 				else {
-					new_score(ngrams[j].node, input_idx, score_val);
+					sm_text_next_node(j, input_idx, input_len, output_idx, score_val);
 				}
 				for (k = j; k < ngrams_size; k++) {
 					set_ngram(ngrams+k, ngrams[j-1].node, j-1);
 				}
 			}
 		}
-		score = get_score(ngrams->node, input_idx);
-		if (!score || score_val < score->val) {
-			output[output_idx] = ' ';
-			sm_text(0UL, input_idx, input_len, output_idx+1, score_val+ngrams_size);
-		}
+		sm_text_next_node(0UL, input_idx, input_len, output_idx, score_val+ngrams_size-ngram_idx);
+		copy_ngrams(stack+stack_idx, ngrams);
+	}
+}
+
+void sm_text_next_node(unsigned long ngram_idx, unsigned long input_idx, unsigned long input_len, unsigned long output_idx, unsigned long score_val) {
+	score_t *score = get_score(ngrams[ngram_idx].node, input_idx);
+	if (!score || score_val < score->val) {
+		output[output_idx] = ' ';
+		sm_text(ngram_idx, input_idx, input_len, output_idx+1, score_val);
+	}
+	score = get_score(ngrams[ngram_idx].node, input_idx);
+	if (!score || score_val < score->val) {
 		if (score) {
 			score->val = score_val;
 		}
 		else {
-			new_score(ngrams->node, input_idx, score_val);
+			new_score(ngrams[ngram_idx].node, input_idx, score_val);
 		}
-		copy_ngrams(stack+stack_idx, ngrams);
 	}
 }
 
@@ -428,6 +425,9 @@ void free_node(node_t *node) {
 			}
 		}
 		free(node->letters);
+	}
+	if (node->scores_n > 0) {
+		free(node->scores);
 	}
 	free(node);
 }
