@@ -21,4 +21,6 @@ sm_text - program for challenge
 
 Usage: sm_text \<size of ngrams\> \<path to corpus\>
 
+sm_text\_\*.txt - inputs
+
 moviequotedb_com.txt - sample corpus containing quotes from http://moviequotedb.com/
